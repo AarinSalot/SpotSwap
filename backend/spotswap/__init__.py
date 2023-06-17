@@ -10,8 +10,9 @@ import csv
 import os
 import openai
 from flask_cors import CORS
-
-openai.api_key = "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"
+from config import Config
+ 
+openai.api_key = Config.OPENAI
 
 # print(os.getcwd())
 db = SQLAlchemy()
