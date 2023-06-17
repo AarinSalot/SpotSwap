@@ -8,8 +8,10 @@ from flask_jwt_extended import JWTManager
 # from twilio.rest import Client
 import csv
 import os
+import openai
 from flask_cors import CORS
 
+openai.api_key = "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"
 
 # print(os.getcwd())
 db = SQLAlchemy()
@@ -75,3 +77,21 @@ def create_app(config=DevelopmentConfig):
         db.session.commit()
 
     return app
+
+def get_response(message):
+
+    response = openai.ChatCompletion.create(
+        model = 'gpt-3.5-turbo',
+        temperature = 1,
+        messages = [
+            {"role": "user", "content": message}
+        ]
+    )
+    rv = response.choices[0]["message"]["content"]
+    return rv
+
+
+print(get_response("A parking spot in LA is $15/hr on average. A homeowner wants to rent out the spot for a lower amount that makes" + 
+                   "his offering competitive, what should be charge if he lists it on a company that takes 5 percent in commision fees"))
+
+
