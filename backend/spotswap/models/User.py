@@ -3,9 +3,9 @@ import math,random
 # from werkzeug.security import generate_password_hash, check_password_hash
 from spotswap.models.utils import rand_pass
 from flask_login import UserMixin
+from spotswap.utils.util_helpers import send_confirmation_mail
 from spotswap import db
 
-# Harshita
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(255), nullable=False)
@@ -65,6 +65,7 @@ class User(db.Model, UserMixin):
         print (datetime.utcnow)
         user_token.valid_sm_sec = valid_sm_sec
         db.session.commit()
+        send_confirmation_mail(user_token.email,OTP)
         return OTP
 
     # Check validity of password

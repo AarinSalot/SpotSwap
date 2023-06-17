@@ -9,8 +9,8 @@ from spotswap import db
 class Bookings(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     customer_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    seller_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    parking_id = db.Column(db.Integer, db.ForeignKey('parking.id'), nullable=False)
+    # seller_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    parking_id = db.Column(db.Integer, db.ForeignKey('parkings.id'), nullable=False)
     start_time_date = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
     end_time_date = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
     payment_reference = db.Column(db.String(255), unique=True, nullable=True)

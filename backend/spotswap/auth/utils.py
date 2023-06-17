@@ -1,5 +1,5 @@
-from crop_analysis import login_manager
-from crop_analysis.models import User
+from spotswap import login_manager
+from spotswap.models import User
 # from tour_management.models import Admin
 from base64 import b64encode
 from base64 import b64decode

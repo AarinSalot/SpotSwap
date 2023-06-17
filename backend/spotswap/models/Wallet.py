@@ -9,7 +9,7 @@ from spotswap import db
 class Wallet(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-    amount = db.Column(db.Integer, default=0, nullabe=False)
+    amount = db.Column(db.Integer, default=0, nullable=False)
     
     # -- Backrefrences for other tables
     # property_id = db.relationship('Property',backref='user',lazy=True)
