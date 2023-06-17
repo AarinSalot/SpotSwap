@@ -1,4 +1,4 @@
-from tour_management import create_app
+from spotswap import create_app
 
 app = create_app()
 

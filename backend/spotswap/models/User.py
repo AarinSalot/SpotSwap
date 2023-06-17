@@ -1,30 +1,28 @@
 from datetime import datetime, timedelta
 import math,random
-from werkzeug.security import generate_password_hash, check_password_hash
-from crop_analysis.models.utils import rand_pass
+# from werkzeug.security import generate_password_hash, check_password_hash
+from spotswap.models.utils import rand_pass
 from flask_login import UserMixin
-from crop_analysis import db
+from spotswap import db
 
 # Harshita
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     first_name = db.Column(db.String(255), nullable=False)
     last_name = db.Column(db.String(255), nullable=False)
-    username = db.Column(db.String(255), unique=True, nullable=False)
     email = db.Column(db.String(255), unique=True, nullable=False)
     phone_number = db.Column(db.String(255), nullable=False)
-    password = db.Column(db.String(255), nullable=False)
-    email_verified = db.Column(db.Boolean, default=False, nullable=False)
-    is_active = db.Column(db.Boolean, default=False, nullable=False)
-    # db.DateTime change dob
-    dob = db.Column(db.String(255), nullable=False)
-    sex = db.Column(db.String(255), nullable=False)
+    is_renter = db.Column(db.Boolean, default=False, nullable=False)
+    
+    #OTP 
     sm_code = db.Column(db.String(255), unique= True, nullable=True)
     valid_sm_sec = db.Column(db.Integer, nullable=True)
     valid_sm_code = db.Column(db.Boolean, default=False, nullable=False)
     sm_code_sent_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=True)
     tokens = db.relationship('UserToken', backref='user', lazy=True)
-    user_crop = db.relationship('UserCrop', backref='user', lazy=True)
+    parkings = db.relationship('Parkings', backref='user', lazy=True)
+    bookings = db.relationship('Bookings', backref='user', lazy=True)
+    wallet = db.relationship('Wallet', backref='user', lazy=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
     
@@ -37,15 +35,15 @@ class User(db.Model, UserMixin):
         return 'User: {}'.format(self.username)
 
 
-    # Create a hash of password
-    @staticmethod
-    def hash_password(password):
-        return generate_password_hash(password)
+    # # Create a hash of password
+    # @staticmethod
+    # def hash_password(password):
+    #     return generate_password_hash(password)
 
 
-    # Check if password entered is same as hash of password
-    def check_password(self, password):
-        return check_password_hash(self.password, password)
+    # # Check if password entered is same as hash of password
+    # def check_password(self, password):
+    #     return check_password_hash(self.password, password)
 
     # Generate OTP
     # Need to connect with twilio for sending sms
