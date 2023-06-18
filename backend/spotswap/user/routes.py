@@ -10,6 +10,7 @@ from spotswap import db, jwt
 from flask_sqlalchemy import func
 from spotswap.utils.util_helpers import send_confirmation_mail
 import json
+from spotswap.user.utils import is_time_slot_available
 from cerberus import Validator
 from spotswap.auth.blocklist import BLOCKLIST
 from flask_api import FlaskAPI, status, exceptions
@@ -364,10 +365,10 @@ def create_booking(parking_id):
 
 
 
-@user.route('/<int:user_id>/parking-lots', methods=['GET'])
+@user.route('/parking-lots', methods=['GET'])
 def get_user_parking_lots(user_id):
     # Retrieve the user associated with the given user_id
-    user = User.query.get_or_404(user_id)
+    user = User.query.filter_by(email=get_jwt_identity()).first()
     
     # Retrieve the parking lots listed by the user
     parking_lots = Parkings.query.filter_by(owner_id=user.id).all()
@@ -420,6 +421,26 @@ def get_money_made():
     
     return jsonify(response_data), 200
 
+
+@user.route('/bookings', methods=['GET'])
+def get_user_bookings():
+    user = User.query.filter_by(email=get_jwt_identity()).first()
+
+    # Retrieve the user's bookings
+    bookings = Bookings.query.filter_by(customer_id=user.id).all()
+
+    # Create a list to store the booking data
+    bookings_data = []
+    for booking in bookings:
+        booking_data = {
+            'id': booking.id,
+            'start_time': booking.start_time_date.strftime('%Y-%m-%d %H:%M:%S'),
+            'end_time': booking.end_time_date.strftime('%Y-%m-%d %H:%M:%S')
+            
+        }
+        bookings_data.append(booking_data)
+
+    return jsonify(bookings_data), 200
 
 
 # Error handler for 404 Not Found
