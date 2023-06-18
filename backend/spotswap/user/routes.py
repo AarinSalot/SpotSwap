@@ -421,6 +421,28 @@ def get_user_parking_lots(user_id):
     return jsonify(response_data), 200
 
 
+@user.route('/wallet/money-made', methods=['GET'])
+@jwt_required()
+def get_money_made():
+    user = User.query.filter_by(email=get_jwt_identity()).first()
+    
+    # Retrieve the wallet transactions for the user
+    transactions = Wallet.query.filter_by(user_id=user.id).all()
+    
+    total_money_made = 0
+    
+    # Calculate the total money made by summing the positive transaction amounts
+    for transaction in transactions:
+        if transaction.amount > 0:
+            total_money_made += transaction.amount
+    
+    response_data = {
+        'user_id': user.id,
+        'money_made': total_money_made
+    }
+    
+    return jsonify(response_data), 200
+
 
 
 # Error handler for 404 Not Found
