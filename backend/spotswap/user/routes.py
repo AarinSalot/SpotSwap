@@ -8,12 +8,14 @@
 
 from functools import wraps
 from lib2to3.pgen2 import token
+from math import radians, sin, cos, sqrt
 from urllib import response
 from flask import Blueprint, render_template, redirect, url_for, flash, jsonify, request
 from flask_login import login_user, current_user, login_required, logout_user
-from spotswap.models import User
+from spotswap.models import User, Address, Parkings, Wallet
 from spotswap.models.utils import rand_pass
 from spotswap import db, jwt
+from flask_sqlalchemy import func
 from spotswap.utils.util_helpers import send_confirmation_mail
 import json
 from cerberus import Validator
@@ -29,10 +31,6 @@ user = Blueprint('user', __name__)
 @user.route('/signup', methods=["POST"])
 def create_account():
     request_body = request.get_json()
-    # validate_signup_req = Validator(user_signup)
-    # if not validate_signup_req.validate(request_body):
-    #     print(validate_signup_req.errors)
-    #     return 'Bad Request', status.HTTP_400_BAD_REQUEST
     org = User()
     org.first_name = request.json.get("first_name", None)
     org.last_name = request.json.get("last_name", None)
@@ -47,8 +45,6 @@ def create_account():
         print('Error Logged : ', err)
         return "Could not register user", status.HTTP_400_BAD_REQUEST
     else:
-        # email_conf_token = UserToken.generate_token(
-        #     'email_confirmation', org.id, 1800)
         return "User Created", status.HTTP_201_CREATED
 
 
@@ -121,37 +117,111 @@ def dashboard():
     return data, status.HTTP_200_OK
 
 
-# @user.route('/states', methods=['GET'])
-# @jwt_required()
-# def states():
-#     state_data = []
-#     state = State.query.all()
-#     for i in state:
-#         state_data.append(i.state_name)
-#         # print(i.state_name)
-#     data = {
-#             "states" : state_data
-#             }
-#     return data, status.HTTP_200_OK
+@user.route('/parking-lots', methods=['POST'])
+@jwt_required()
+def create_parking_lot():
+    try:
+        request_body = request.get_json()
+        
+        # Extract parking lot data from the request
+        street = request_body.get('street')
+        city = request_body.get('city')
+        state = request_body.get('state')
+        zip_code = request_body.get('zip')
+        # price = request_body.get('price')
+        user = User.query.filter_by(email=get_jwt_identity()).first()
+        
+        # Check if the address already exists
+        address = Address.query.filter_by(street=street, city=city, state=state, zip=zip_code).first()
+        if address is None:
+            # Create a new Address object
+            address = Address(street=street, city=city, state=state, zip=zip_code, latitude=None, longitude=None)
+            db.session.add(address)
+            db.session.commit()
+        
+        # Create a new Parking object associated with the Address
+        
+        ####################
+        # ADD OPENAI LOGIC #
+        ####################
+        parking = Parkings(address_id=address.id, price=0, owner_id=user.id)
+        # Set other relevant columns of the parking lot
+        
+        db.session.add(parking)
+        db.session.commit()
+        
+        response_data = {
+            'id': parking.id,
+            'street': street,
+            'city': city,
+            'state': state,
+            'zip': zip_code,
+            'price': 0,
+            # Include other relevant data in the response
+        }
+        return jsonify(response_data), 201
+    
+    except Exception as e:
+        error_message = "An error occurred while creating the parking lot"
+        user.logger.exception(error_message)
+        return jsonify({'error': error_message}), 500
+
+
+@user.route('/search', methods=['GET'])
+def search_parking_lots():
+    # Get the user's current location from the request
+    user_latitude = float(request.args.get('latitude'))
+    user_longitude = float(request.args.get('longitude'))
+    
+    # Define the search radius in kilometers (adjust as needed)
+    search_radius = 5
+    
+    # Convert the search radius to meters for distance calculation
+    search_radius_meters = search_radius * 1000
+    
+    # Perform a query to find relevant parking lots within the search radius
+    nearby_parking_lots = Parkings.query.join(Address).filter(
+        Parkings.address_id == Address.id,
+        func.sqrt(
+            func.pow(radians(user_latitude - Address.latitude), 2) +
+            func.pow(radians(user_longitude - Address.longitude), 2)
+        ) * 6371 <= search_radius
+    ).all()
+    
+    # Create a list to store the results
+    results = []
+    
+    # Iterate over the nearby parking lots and extract relevant information
+    for parking_lot in nearby_parking_lots:
+        result = {
+            'id': parking_lot.id,
+            'street': parking_lot.address.street,
+            'city': parking_lot.address.city,
+            'state': parking_lot.address.state,
+            'zip': parking_lot.address.zip,
+            'price': parking_lot.price,
+            # Include other relevant data in the result
+        }
+        results.append(result)
+    
+    return jsonify(results), 200
 
 
 
 
-# @user.route('/districts/<string:token>', methods=['GET'])
-# @jwt_required()
-# def district_name(token):
-#     district_data = []
-#     state = State.query.filter_by(state_name=token).first()
-#     print(state)
-#     # write code from here. Get distrcit data and send it all to the user. do the same for season, crop, etc.
-#     district = District.query.filter_by(state_id=state.state_id).all()
-#     for i in district:
-#         district_data.append(i.district_name)
-#         # print(i.state_name)
-#     data = {
-#             "district" : district_data
-#             }
-#     return data, status.HTTP_200_OK
+
+# Error handler for 404 Not Found
+@user.errorhandler(404)
+def not_found_error(error):
+    return jsonify({'error': 'Not Found'}), 404
+
+
+# Error handler for 500 Internal Server Error
+@user.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Internal Server Error'}), 500
+
+
 
 
 

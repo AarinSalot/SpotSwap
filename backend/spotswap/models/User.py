@@ -26,34 +26,9 @@ class User(db.Model, UserMixin):
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
     
-    # -- Backrefrences for other tables
-    # property_id = db.relationship('Property',backref='user',lazy=True)
-    # tenant_id = db.relationship('Tenant',backref='user',lazy=True)
-    # support_id = db.relationship('Supportquery',backref='user',lazy=True)
-    
     def __str__(self):
         return 'User: {}'.format(self.username)
 
-
-    # # Create a hash of password
-    # @staticmethod
-    # def hash_password(password):
-    #     return generate_password_hash(password)
-
-
-    # # Check if password entered is same as hash of password
-    # def check_password(self, password):
-    #     return check_password_hash(self.password, password)
-
-    # Generate OTP
-    # Need to connect with twilio for sending sms
-    #     message = client.messages.create(
-    # body='Hi there',
-    # from_='+14632637937',
-    # to='+18127784955'
-    # )
-
-    # print(message.sid)
     @staticmethod
     def generate_smcode(user_id, valid_sm_sec):
         OTP = rand_pass(9)                              # Generate password using rand_pass

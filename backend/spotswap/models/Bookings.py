@@ -23,5 +23,5 @@ class Bookings(db.Model, UserMixin):
     # support_id = db.relationship('Supportquery',backref='user',lazy=True)
     
     def __str__(self):
-        return 'User: {}'.format(self.username)
+        return 'Bookings: {}'.format(self.id)
 
