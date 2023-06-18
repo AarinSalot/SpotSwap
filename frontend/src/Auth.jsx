@@ -1,19 +1,25 @@
 import React, { useState } from "react"
-import ReactSwitch from 'react-switch';
+import Switch from "react-switch";
+import OTP from "./OTP";
 
 export default function (props) {
   const [authMode, setAuthMode] = useState("signin");
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [isRenter, setIsRenter] = useState(false);
-
+  
   const changeAuthMode = () => {
     setAuthMode(authMode === "signin" ? "signup" : "signin")
   }
 
-  const handleNameChange = (e) => {
-    setName(e.target.value);
+  const handleFirstNameChange = (e) => {
+    setFirstName(e.target.value);
+  }
+
+  const handleLastNameChange = (e) => {
+    setLastName(e.target.value);
   }
 
   const handleEmailChange = (e) => {
@@ -26,6 +32,11 @@ export default function (props) {
 
   const handleIsRenterChange = val => {
     setIsRenter(val);
+  }
+
+  const handleSubmit = () => {
+    this.props.history.push('/otp');
+    // return <OTP />;
   }
 
   if (authMode === "signin") {
@@ -48,35 +59,23 @@ export default function (props) {
                 placeholder="Enter email"
               />
             </div>
-            <div className="form-group mt-3">
-              <label>Password</label>
-              <input
-                type="password"
-                className="form-control mt-1"
-                placeholder="Enter password"
-              />
-            </div>
             <div className="d-grid gap-2 mt-3">
               <button type="submit" className="btn btn-primary">
                 Submit
               </button>
             </div>
-            <p className="text-center mt-2">
+            {/* <p className="text-center mt-2">
               Forgot <a href="#">password?</a>
-            </p>
+            </p> */}
           </div>
         </form>
       </div>
     )
   }
 
-  console.log(name);
-  console.log(isRenter);
-  console.log(authMode);
-
   return (
     <div className="Auth-form-container">
-      <form className="Auth-form">
+      <form className="Auth-form" action="/otp" method="POST" onSubmit={handleSubmit}>
         <div className="Auth-form-content">
           <h3 className="Auth-form-title">Sign Up</h3>
           <div className="text-center">
@@ -86,12 +85,21 @@ export default function (props) {
             </span>
           </div>
           <div className="form-group mt-3">
-            <label>Full Name</label>
+            <label>First Name</label>
             <input
-              type="email"
+              type="firstName"
               className="form-control mt-1"
-              placeholder="e.g Jane Doe"
-              onChange={handleNameChange}
+              placeholder="e.g Jane"
+              onChange={handleFirstNameChange}
+            />
+          </div>
+          <div className="form-group mt-3">
+            <label>Last Name</label>
+            <input
+              type="firstName"
+              className="form-control mt-1"
+              placeholder="e.g Doe"
+              onChange={handleLastNameChange}
             />
           </div>
           <div className="form-group mt-3">
@@ -114,7 +122,8 @@ export default function (props) {
           </div>
           <div className="form-group mt-3">
             <label>Looking to rent out your spot?</label>
-            <ReactSwitch
+            <br/>
+            <Switch
               checked={isRenter}
               onChange={handleIsRenterChange}
             />
@@ -124,9 +133,9 @@ export default function (props) {
               Submit
             </button>
           </div>
-          <p className="text-center mt-2">
+          {/* <p className="text-center mt-2">
             Forgot <a href="#">password?</a>
-          </p>
+          </p> */}
         </div>
       </form>
     </div>

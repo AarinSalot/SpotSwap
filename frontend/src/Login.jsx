@@ -85,12 +85,16 @@ import "bootstrap/dist/css/bootstrap.min.css"
 import "./Login.css"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
 import Auth from "./Auth"
+import OTP from "./OTP"
+import UserDashboard from "./UserDashboard"
 
 function Login() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/auth" element={<Auth />} />
+        <Route path="/otp" element={<OTP />} />
+        <Route path="/userdash" element={<UserDashboard />} />
       </Routes>
     </BrowserRouter>
   )
