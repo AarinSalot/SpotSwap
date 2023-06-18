@@ -87,6 +87,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom"
 import Auth from "./Auth"
 import OTP from "./OTP"
 import UserDashboard from "./UserDashboard"
+import RenterDashboard from "./RenterDashboard"
 
 function Login() {
   return (
@@ -95,6 +96,7 @@ function Login() {
         <Route path="/auth" element={<Auth />} />
         <Route path="/otp" element={<OTP />} />
         <Route path="/userdash" element={<UserDashboard />} />
+        <Route path="/renterdash" element={<RenterDashboard />} />
       </Routes>
     </BrowserRouter>
   )
