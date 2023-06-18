@@ -13,6 +13,7 @@ class Parkings(db.Model):
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
     address = db.relationship('Address', backref='parkings', lazy=True)
     bookings = db.relationship('Booking', backref='parking', lazy=True)
+    availabilities = db.relationship('Availability', backref='parking', lazy=True)
     # images = db.relationship('ParkingImage', backref='parking', lazy=True)
     
     def __str__(self):

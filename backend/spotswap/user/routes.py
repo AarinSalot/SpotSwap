@@ -12,7 +12,7 @@ from math import radians, sin, cos, sqrt
 from urllib import response
 from flask import Blueprint, render_template, redirect, url_for, flash, jsonify, request
 from flask_login import login_user, current_user, login_required, logout_user
-from spotswap.models import User, Address, Parkings, Wallet
+from spotswap.models import User, Address, Parkings, Wallet, Availability, Bookings
 from spotswap.models.utils import rand_pass
 from spotswap import db, jwt
 from flask_sqlalchemy import func
@@ -167,6 +167,9 @@ def create_parking_lot():
         return jsonify({'error': error_message}), 500
 
 
+
+
+
 @user.route('/search', methods=['GET'])
 def search_parking_lots():
     # Get the user's current location from the request
@@ -193,6 +196,21 @@ def search_parking_lots():
     
     # Iterate over the nearby parking lots and extract relevant information
     for parking_lot in nearby_parking_lots:
+        # Retrieve the availability information for the parking lot
+        availabilities = Availability.query.filter_by(parking_id=parking_lot.id, is_available=True).all()
+        
+        # Create a list to store the availability data
+        availability_data = []
+        
+        # Iterate over the availabilities and extract relevant information
+        for availability in availabilities:
+            availability_info = {
+                'start_time': availability.start_time.strftime('%H:%M'),
+                'end_time': availability.end_time.strftime('%H:%M'),
+                'is_available': availability.is_available
+            }
+            availability_data.append(availability_info)
+        
         result = {
             'id': parking_lot.id,
             'street': parking_lot.address.street,
@@ -200,12 +218,177 @@ def search_parking_lots():
             'state': parking_lot.address.state,
             'zip': parking_lot.address.zip,
             'price': parking_lot.price,
+            'availability': availability_data,
             # Include other relevant data in the result
         }
         results.append(result)
     
+    if len(results) == 0:
+        return jsonify({'message': 'No parking lots found in the area'}), 404
+    
     return jsonify(results), 200
 
+
+
+
+
+@user.route('/parking-lots/<int:parking_id>/availability', methods=['POST'])
+def add_parking_lot_availability(parking_id):
+    parking_lot = Parkings.query.get_or_404(parking_id)
+    
+    request_body = request.get_json()
+    start_time = request_body.get('start_time')
+    end_time = request_body.get('end_time')
+    is_available = request_body.get('is_available', True)
+    
+    # Create a new availability record for the parking lot
+    availability = Availability(
+        parking_id=parking_id,
+        start_time=start_time,
+        end_time=end_time,
+        is_available=is_available
+    )
+    
+    db.session.add(availability)
+    db.session.commit()
+    
+    response_data = {
+        'id': availability.id,
+        'start_time': availability.start_time.strftime('%H:%M'),
+        'end_time': availability.end_time.strftime('%H:%M'),
+        'is_available': availability.is_available
+    }
+    
+    return jsonify(response_data), 201
+
+
+
+
+
+@user.route('/parking-lots/<int:parking_id>/availability/<int:availability_id>', methods=['PUT'])
+def update_parking_lot_availability(parking_id, availability_id):
+    parking_lot = Parkings.query.get_or_404(parking_id)
+    
+    availability = Availability.query.filter_by(id=availability_id, parking_id=parking_id).first()
+    if not availability:
+        return 'Availability not found', status.HTTP_404_NOT_FOUND
+    
+    request_body = request.get_json()
+    start_time = request_body.get('start_time')
+    end_time = request_body.get('end_time')
+    is_available = request_body.get('is_available', True)
+    
+    # Update the availability record
+    availability.start_time = start_time
+    availability.end_time = end_time
+    availability.is_available = is_available
+    
+    db.session.commit()
+    
+    response_data = {
+        'id': availability.id,
+        'start_time': availability.start_time.strftime('%H:%M'),
+        'end_time': availability.end_time.strftime('%H:%M'),
+        'is_available': availability.is_available
+    }
+    
+    return jsonify(response_data), 200
+
+
+
+
+
+@user.route('/parking-lots/<int:parking_id>/availability/<int:availability_id>', methods=['DELETE'])
+def delete_parking_lot_availability(parking_id, availability_id):
+    parking_lot = Parkings.query.get_or_404(parking_id)
+    
+    availability = Availability.query.filter_by(id=availability_id, parking_id=parking_id).first()
+    if not availability:
+        return 'Availability not found', status.HTTP_404_NOT_FOUND
+    
+    db.session.delete(availability)
+    db.session.commit()
+    
+    return '', 204
+
+
+@user.route('/parking-lots/<int:parking_id>/bookings', methods=['POST'])
+@jwt_required()
+def create_booking(parking_id):
+    user = User.query.filter_by(email=get_jwt_identity()).first()
+    
+    # Retrieve the parking lot associated with the given parking_id
+    parking_lot = Parkings.query.get_or_404(parking_id)
+    
+    # Extract the booking details from the request
+    request_body = request.get_json()
+    start_time = request_body.get('start_time')
+    end_time = request_body.get('end_time')
+    
+    # Perform any additional validation or checks on the booking details
+    if not start_time or not end_time:
+        return jsonify({'error': 'Invalid booking details'}), 400
+    
+    if start_time >= end_time:
+        return jsonify({'error': 'Invalid booking duration'}), 400
+    
+    # Create a new booking object
+    booking = Bookings(customer_id=user.id, parking_id=parking_lot.id, start_time_date=start_time, end_time_date=end_time)
+    
+    try:
+        # Add the booking to the database session
+        db.session.add(booking)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': 'Failed to create booking', 'message': str(e)}), 500
+    
+    response_data = {
+        'booking_id': booking.id,
+        'parking_lot_id': parking_lot.id,
+        'street': parking_lot.address.street,
+        'city': parking_lot.address.city,
+        'state': parking_lot.address.state,
+        'zip': parking_lot.address.zip,
+        'start_time': booking.start_time_date.strftime('%Y-%m-%d %H:%M:%S'),
+        'end_time': booking.end_time_date.strftime('%Y-%m-%d %H:%M:%S'),
+        # Include other relevant booking data in the response
+    }
+    
+    return jsonify(response_data), 201
+
+@user.route('/users/<int:user_id>/parking-lots', methods=['GET'])
+def get_user_parking_lots(user_id):
+    # Retrieve the user associated with the given user_id
+    user = User.query.get_or_404(user_id)
+    
+    # Retrieve the parking lots listed by the user
+    parking_lots = Parkings.query.filter_by(owner_id=user.id).all()
+    
+    # Create a list to store the parking lot data
+    parking_lot_data = []
+    
+    # Iterate over the parking lots and extract relevant information
+    for parking_lot in parking_lots:
+        parking_lot_info = {
+            'id': parking_lot.id,
+            'street': parking_lot.street,
+            'city': parking_lot.city,
+            'state': parking_lot.state,
+            'zip': parking_lot.zip,
+            'price': parking_lot.price,
+            # Include other relevant data in the response
+        }
+        parking_lot_data.append(parking_lot_info)
+    
+    response_data = {
+        'user_id': user.id,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'parking_lots': parking_lot_data
+    }
+    
+    return jsonify(response_data), 200
 
 
 
@@ -225,215 +408,6 @@ def internal_error(error):
 
 
 
-
-# @user.route('/season', methods=['GET'])
-# @jwt_required()
-# def season_name():
-#     season_data = []
-#     season = Season.query.all()
-#     print(season)
-#     # write code from here. Get distrcit data and send it all to the user. do the same for season, crop, etc.
-#     for i in season:
-#         season_data.append(i.season_name)
-#         # print(i.state_name)
-#     data = {
-#             "season" : season_data
-#             }
-#     return data, status.HTTP_200_OK
-
-
-
-
-# @user.route('/crop', methods=['GET'])
-# @jwt_required()
-# def crop_name():
-#     crop_data = []
-#     crop = Crop.query.all()
-#     print(crop)
-#     # write code from here. Get distrcit data and send it all to the user. do the same for season, crop, etc.
-#     for i in crop:
-#         crop_data.append(i.crop_name)
-#         # print(i.state_name)
-#     data = {
-#             "crop" : crop_data
-#             }
-#     return data, status.HTTP_200_OK
-
-
-# @user.route('/myentries', methods=['GET'])
-# @jwt_required()
-# def myentries():
-#     user = User.query.filter_by(email=get_jwt_identity()).first()
-#     usercrop = UserCrop.query.filter_by(user_id=user.id).all()
-#     print(usercrop)
-#     result = []
-#     if usercrop:
-#         for j in usercrop:
-    
-#             cropdata = CropData.query.filter_by(crop_data_id=j.cropdata_id).all()
-#             for i in cropdata:
-#                 temp = {}
-#                 cropname = Crop.query.filter_by(crop_id=i.crop_id).first()
-#                 seasonname = Season.query.filter_by(season_id=i.season_id).first()
-#                 districtname = District.query.filter_by(district_id=i.district_id).first()
-#                 temp["cropdataid"] = i.crop_data_id
-#                 temp["crop_name"] = cropname.crop_name
-#                 temp["season_name"] = seasonname.season_name
-#                 temp["district_name"] = districtname.district_name
-#                 temp["area"] = i.area
-#                 temp["production"] = i.production
-#                 temp["yield_data"] = i.yield_data
-#                 temp["profit"] = i.profit
-#                 temp["rainfall"] = i.rainfall
-#                 temp["year"] = i.year
-#                 print(temp)
-#                 result.append(temp)
-#         print(result)
-#         data = {
-#             "crop" : result
-#             }
-#         return data, status.HTTP_200_OK
-#     else:
-#         return "No data found" ,status.HTTP_204_NO_CONTENT
-    
-
-
-
-# @user.route('/delete/cropdata', methods=['DELETE'])
-# @jwt_required()
-# def deletecropdata():
-#     request_body = request.get_json()
-#     cropid = request.json.get("crop_id", None)
-#     print("sdasa",cropid)
-#     try:
-#         usercrop = UserCrop.query.filter_by(cropdata_id=cropid).delete()
-#         cropdata = CropData.query.filter_by(crop_data_id=cropid).delete()
-#         db.session.commit()
-#     except Exception as err:
-#         print('Error Logged : ', err)
-#         return "Could not find crop data", status.HTTP_400_BAD_REQUEST
-#     else:
-#         return "Deleted Crop Data", status.HTTP_202_ACCEPTED
-    
-
-# @user.route('/update/cropdata', methods=['PUT'])
-# @jwt_required()
-# def updatecropdata():
-
-#     cropid = request.json.get("crop_id", None)
-#     cropdata = CropData.query.filter_by(crop_data_id=cropid).first()
-#     print("ads", cropdata)
-#     crop_name = request.json.get("crop_name", None)
-#     season_name = request.json.get("season_name", None)
-#     district_name = request.json.get("district_name", None)
-#     area = request.json.get("area", None)
-#     production = request.json.get("production", None)
-#     yield_data = request.json.get("yeild_data", None)
-#     profit = request.json.get("profit", None)
-#     rainfall = request.json.get("rainfall", None)
-#     year = request.json.get("year", None)
-#     crop_id = Crop.query.filter_by(crop_name=crop_name).first()
-#     season_id = Season.query.filter_by(season_name=season_name).first()
-#     district_id = District.query.filter_by(district_name=district_name).first()
-
-#     print(crop_id.crop_id)
-#     print(season_id.season_id)
-#     print(district_id.district_id)
-#     # print(user.id)
-#     print(area)
-#     print(production)
-#     print(yield_data)
-#     print(profit)
-#     print(rainfall)
-#     print(year)
-
-
-
-#     cropdata.crop_id = crop_id.crop_id
-#     cropdata.season_id = season_id.season_id
-#     cropdata.district_id = district_id.district_id
-#     cropdata.area = area
-#     cropdata.production = production
-#     cropdata.yield_data = yield_data
-#     cropdata.profit = profit
-#     cropdata.rainfall = rainfall
-#     cropdata.year = year
-
-#     try:
-#         db.session.commit()
-#     except Exception as err:
-#         print('Error Logged : ', err)
-#         return "Could not update crop data", status.HTTP_400_BAD_REQUEST
-#     else:
-#         return "Updated Crop Data", status.HTTP_200_OK
-
-
-
-
-# @user.route('/cropdata/add', methods=['POST'])
-# @jwt_required()
-# def crop_data_add():
-#     request_body = request.get_json()
-#     crop_name = request.json.get("crop_name", None)
-#     season_name = request.json.get("season_name", None)
-#     district_name = request.json.get("district_name", None)
-#     area = request.json.get("area", None)
-#     production = request.json.get("production", None)
-#     yield_data = request.json.get("yeild_data", None)
-#     profit = request.json.get("profit", None)
-#     rainfall = request.json.get("rainfall", None)
-#     year = request.json.get("year", None)
-#     crop_id = Crop.query.filter_by(crop_name=crop_name).first()
-#     season_id = Season.query.filter_by(season_name=season_name).first()
-#     district_id = District.query.filter_by(district_name=district_name).first()
-#     user = User.query.filter_by(email=get_jwt_identity()).first()
-    
-    
-#     print(crop_id.crop_id)
-#     print(season_id.season_id)
-#     print(district_id.district_id)
-#     print(user.id)
-#     print(area)
-#     print(production)
-#     print(yield_data)
-#     print(profit)
-#     print(rainfall)
-#     print(year)
-
-#     cropdata = CropData()
-#     cropdata.crop_id = crop_id.crop_id
-#     cropdata.season_id = season_id.season_id
-#     cropdata.district_id = district_id.district_id
-#     cropdata.area = area
-#     cropdata.production = production
-#     cropdata.yield_data = yield_data
-#     cropdata.profit = profit
-#     cropdata.rainfall = rainfall
-#     cropdata.year = year
-    
-#     try:
-#         db.session.add(cropdata)
-#         db.session.commit()
-    
-#     except Exception as err:
-#         print('Error Logged : ', err)
-#         return "Could not add crop data", status.HTTP_400_BAD_REQUEST
-#     else:
-#         usercrop = UserCrop()
-#         usercrop.user_id = user.id
-#         usercrop.cropdata_id = cropdata.crop_data_id
-#         try:
-#             db.session.add(usercrop)
-#             db.session.commit()
-#         except Exception as err:
-#             print('Error Logged : ', err)
-#             return "Could Not Map User and Crop", status.HTTP_400_BAD_REQUEST
-#         else:
-#             return "Data Added", status.HTTP_200_OK
-
-    
-
-
 @user.route("/logout", methods=["POST"])
 @jwt_required()
 def logout():
@@ -442,39 +416,3 @@ def logout():
     jti = get_jwt()["jti"]
     BLOCKLIST.add(jti)
     return response
-  
-
-# @user.route('/crop/visualize', methods=['POST'])
-# @jwt_required()
-# def crop_production_by_state():
-#     district_name = request.json.get('district_name', '')
-#     district_id = District.query.filter_by(district_name=district_name).first()
-#     print("DSa", district_id.district_id)
-#     crop_data = CropData.query.filter_by(district_id=district_id.district_id).all()
-#     crop_data_obj = []
-#     for crop in crop_data:
-#         temp = {}
-#         crop_id = Crop.query.filter_by(crop_id=crop.crop_id).first()
-#         temp["crop_name"] = crop_id.crop_name
-#         temp["area"] = crop.area
-#         temp["production"] = crop.production
-#         temp["yield_data"] = crop.yield_data
-#         temp["profit"] = crop.profit
-#         temp["rainfall"] = crop.rainfall
-#         crop_data_obj.append(temp)
-#     crops = {}
-#     for data in crop_data_obj:
-#         name = data['crop_name']
-#         if name in crops:
-#             crops[name]['profit'].append(data['profit'])
-#             crops[name]['yield_data'].append(data['yield_data'])
-#         else:
-#             crops[name] = {'crop_name': name, 'profit': [data['profit']], 'yield_data': [data['yield_data']]}
-    
-#     result = []
-#     for crop in crops.values():
-#         crop['profit'] = sum(crop['profit']) / len(crop['profit'])
-#         crop['yield_data'] = sum(crop['yield_data']) / len(crop['yield_data'])
-#         result.append(crop)
-#     result_final = {"data" : result}
-#     return result_final, status.HTTP_200_OK

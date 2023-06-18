@@ -45,6 +45,7 @@ def create_app(config=DevelopmentConfig):
     from spotswap.models.UserToken import UserToken
     from spotswap.models.Wallet import Wallet 
     from spotswap.models.Address import Address
+    from spotswap.models.Availability import Availability
     # from iot_security.api.routes import api
     from spotswap.user.routes import user
     app.register_blueprint(user,url_prefix='/api/user')
