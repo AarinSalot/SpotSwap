@@ -96,6 +96,8 @@ def create_parking_lot():
         city = request_body.get('city')
         state = request_body.get('state')
         zip_code = request_body.get('zip')
+        latitude = request_body.get('latitude')
+        longitude = request_body.get('longitude')
         # price = request_body.get('price')
         user = User.query.filter_by(email=get_jwt_identity()).first()
         
@@ -103,7 +105,7 @@ def create_parking_lot():
         address = Address.query.filter_by(street=street, city=city, state=state, zip=zip_code).first()
         if address is None:
             # Create a new Address object
-            address = Address(street=street, city=city, state=state, zip=zip_code, latitude=None, longitude=None)
+            address = Address(street=street, city=city, state=state, zip=zip_code, latitude=latitude, longitude=longitude)
             db.session.add(address)
             db.session.commit()
         
@@ -187,7 +189,7 @@ def search_parking_lots():
             'state': parking_lot.address.state,
             'zip': parking_lot.address.zip,
             'price': parking_lot.price,
-            'availability': availability_data,
+            'availability': availability_data
             # Include other relevant data in the result
         }
         results.append(result)
@@ -362,7 +364,7 @@ def create_booking(parking_id):
 
 
 
-@user.route('/users/<int:user_id>/parking-lots', methods=['GET'])
+@user.route('/<int:user_id>/parking-lots', methods=['GET'])
 def get_user_parking_lots(user_id):
     # Retrieve the user associated with the given user_id
     user = User.query.get_or_404(user_id)
