@@ -7,6 +7,7 @@ from spotswap import db
 class Availability(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     parking_id = db.Column(db.Integer, db.ForeignKey('parkings.id'), nullable=False)
+    date = db.Column(db.Date, nullable=False)
     start_time = db.Column(db.Time, nullable=False)
     end_time = db.Column(db.Time, nullable=False)
     is_available = db.Column(db.Boolean, default=True, nullable=False)

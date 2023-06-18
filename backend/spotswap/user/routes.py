@@ -141,13 +141,13 @@ def search_parking_lots():
     # Get the user's current location from the request
     user_latitude = float(request.args.get('latitude'))
     user_longitude = float(request.args.get('longitude'))
-    
+
     # Define the search radius in kilometers (adjust as needed)
     search_radius = 5
-    
+
     # Convert the search radius to meters for distance calculation
     search_radius_meters = search_radius * 1000
-    
+
     # Perform a query to find relevant parking lots within the search radius
     nearby_parking_lots = Parkings.query.join(Address).filter(
         Parkings.address_id == Address.id,
@@ -156,27 +156,28 @@ def search_parking_lots():
             func.pow(radians(user_longitude - Address.longitude), 2)
         ) * 6371 <= search_radius
     ).all()
-    
+
     # Create a list to store the results
     results = []
-    
+
     # Iterate over the nearby parking lots and extract relevant information
     for parking_lot in nearby_parking_lots:
         # Retrieve the availability information for the parking lot
         availabilities = Availability.query.filter_by(parking_id=parking_lot.id, is_available=True).all()
-        
+
         # Create a list to store the availability data
         availability_data = []
-        
+
         # Iterate over the availabilities and extract relevant information
         for availability in availabilities:
             availability_info = {
+                'date': availability.date.strftime('%Y-%m-%d'),
                 'start_time': availability.start_time.strftime('%H:%M'),
                 'end_time': availability.end_time.strftime('%H:%M'),
                 'is_available': availability.is_available
             }
             availability_data.append(availability_info)
-        
+
         result = {
             'id': parking_lot.id,
             'street': parking_lot.address.street,
@@ -188,93 +189,90 @@ def search_parking_lots():
             # Include other relevant data in the result
         }
         results.append(result)
-    
+
     if len(results) == 0:
         return jsonify({'message': 'No parking lots found in the area'}), 404
-    
+
     return jsonify(results), 200
-
-
-
 
 
 @user.route('/parking-lots/<int:parking_id>/availability', methods=['POST'])
 def add_parking_lot_availability(parking_id):
     parking_lot = Parkings.query.get_or_404(parking_id)
-    
+
     request_body = request.get_json()
+    date = request_body.get('date')
     start_time = request_body.get('start_time')
     end_time = request_body.get('end_time')
     is_available = request_body.get('is_available', True)
-    
+
     # Create a new availability record for the parking lot
     availability = Availability(
         parking_id=parking_id,
+        date=date,
         start_time=start_time,
         end_time=end_time,
         is_available=is_available
     )
-    
+
     db.session.add(availability)
     db.session.commit()
-    
+
     response_data = {
         'id': availability.id,
+        'date': availability.date.strftime('%Y-%m-%d'),
         'start_time': availability.start_time.strftime('%H:%M'),
         'end_time': availability.end_time.strftime('%H:%M'),
         'is_available': availability.is_available
     }
-    
+
     return jsonify(response_data), 201
-
-
-
 
 
 @user.route('/parking-lots/<int:parking_id>/availability/<int:availability_id>', methods=['PUT'])
 def update_parking_lot_availability(parking_id, availability_id):
     parking_lot = Parkings.query.get_or_404(parking_id)
-    
+
     availability = Availability.query.filter_by(id=availability_id, parking_id=parking_id).first()
     if not availability:
         return 'Availability not found', status.HTTP_404_NOT_FOUND
-    
+
     request_body = request.get_json()
+    date = request_body.get('date')
     start_time = request_body.get('start_time')
     end_time = request_body.get('end_time')
     is_available = request_body.get('is_available', True)
-    
+
     # Update the availability record
+    availability.date = date
     availability.start_time = start_time
     availability.end_time = end_time
     availability.is_available = is_available
-    
+
     db.session.commit()
-    
+
     response_data = {
         'id': availability.id,
+        'date': availability.date.strftime('%Y-%m-%d'),
         'start_time': availability.start_time.strftime('%H:%M'),
         'end_time': availability.end_time.strftime('%H:%M'),
         'is_available': availability.is_available
     }
-    
+
     return jsonify(response_data), 200
-
-
-
 
 
 @user.route('/parking-lots/<int:parking_id>/availability/<int:availability_id>', methods=['DELETE'])
 def delete_parking_lot_availability(parking_id, availability_id):
     parking_lot = Parkings.query.get_or_404(parking_id)
-    
+
     availability = Availability.query.filter_by(id=availability_id, parking_id=parking_id).first()
     if not availability:
         return 'Availability not found', status.HTTP_404_NOT_FOUND
-    
+
     db.session.delete(availability)
     db.session.commit()
-    
+
     return '', 204
 
 
@@ -282,46 +280,52 @@ def delete_parking_lot_availability(parking_id, availability_id):
 @jwt_required()
 def create_booking(parking_id):
     request_body = request.get_json()
-    
+
     # Extract booking data from the request
+    start_date = request_body.get('start_date')
     start_time = request_body.get('start_time')
+    end_date = request_body.get('end_date')
     end_time = request_body.get('end_time')
     # Other booking data...
-    
+
     user = User.query.filter_by(email=get_jwt_identity()).first()
     parking_lot = Parkings.query.get_or_404(parking_id)
-    
+
     # Check if the requested time slot is available
     availability = Availability.query.filter_by(parking_id=parking_id, is_available=True).first()
-    if availability is None or not is_time_slot_available(availability, start_time, end_time):
+    if availability is None or not is_time_slot_available(availability, start_date, start_time, end_date, end_time):
         return "Time slot is not available", 400
-    
+
     # Create the booking
     booking = Bookings(
         customer_id=user.id,
         parking_id=parking_id,
-        start_time_date=start_time,
-        end_time_date=end_time
+        start_date=start_date,
+        start_time=start_time,
+        end_date=end_date,
+        end_time=end_time
         # Other booking data...
     )
-    
+
     # Update the availability based on the booked time slot
     if start_time > availability.start_time and end_time < availability.end_time:
         # Booking is within the availability time slot, split it into two availabilities
         remaining_availability_1 = Availability(
             parking_id=parking_id,
+            date=availability.date,
             start_time=availability.start_time,
             end_time=start_time
         )
         remaining_availability_2 = Availability(
             parking_id=parking_id,
+            date=availability.date,
             start_time=end_time,
             end_time=availability.end_time
         )
-        
+
         # Mark the original availability as booked
         availability.is_available = False
-        
+
         db.session.add_all([booking, remaining_availability_1, remaining_availability_2])
     elif start_time > availability.start_time:
         # Booking starts after the availability start time, update the availability end time
@@ -335,9 +339,9 @@ def create_booking(parking_id):
         # Booking covers the entire availability time slot, mark it as booked
         availability.is_available = False
         db.session.add_all([booking, availability])
-    
+
     db.session.commit()
-    
+
     response_data = {
         'booking_id': booking.id,
         'parking_lot_id': parking_lot.id,
@@ -345,12 +349,15 @@ def create_booking(parking_id):
         'city': parking_lot.address.city,
         'state': parking_lot.address.state,
         'zip': parking_lot.address.zip,
-        'start_time': booking.start_time_date.strftime('%Y-%m-%d %H:%M:%S'),
-        'end_time': booking.end_time_date.strftime('%Y-%m-%d %H:%M:%S')
+        'start_date': booking.start_date.strftime('%Y-%m-%d'),
+        'start_time': booking.start_time.strftime('%H:%M'),
+        'end_date': booking.end_date.strftime('%Y-%m-%d'),
+        'end_time': booking.end_time.strftime('%H:%M')
         # Include other relevant booking data in the response
     }
-    
+
     return jsonify(response_data), 201
+
 
 
 @user.route('/users/<int:user_id>/parking-lots', methods=['GET'])
