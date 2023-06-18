@@ -5,7 +5,7 @@ from datetime import timedelta
 class Config:
     ENV = 'production'
     SECRET_KEY = 'enter a secret key'
-    OPENAI = "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"
+    OPENAI = "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"
     # SQLALCHEMY_DATABASE_URI = "postgresql://postgres:root@localhost:5432/adt_crop"
     SQLALCHEMY_DATABASE_URI = "postgresql://spotswapdata_user:vUJOC1L7lk3NYcb1LRDsfpIMQVxa5SZc@dpg-ci70idp8g3n3vm3m5prg-a.oregon-postgres.render.com/spotswapdata"
     MAIL_SERVER = 'smtp.gmail.com'
