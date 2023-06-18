@@ -4,6 +4,7 @@ from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_mail import Mail
 from spotswap.config import DevelopmentConfig
+
 from flask_jwt_extended import JWTManager
 # from twilio.rest import Client
 import csv
@@ -44,8 +45,6 @@ def create_app(config=DevelopmentConfig):
     from spotswap.models.User import User
     from spotswap.models.UserToken import UserToken
     from spotswap.models.Wallet import Wallet 
-    from spotswap.models.Address import Address
-    from spotswap.models.Availability import Availability
     # from iot_security.api.routes import api
     from spotswap.user.routes import user
     app.register_blueprint(user,url_prefix='/api/user')
@@ -94,11 +93,13 @@ def get_response(message):
 
 
 def get_price(city):
-    surrounding_price = get_response("Create a lower bound guess on the average hourly parking price in" + city + "Make the best possible guess you can." +
-                       "Return only the price, and say nothing else.")
-    our_price = get_response("A parking spot in LA is" + surrounding_price +  "on average. A homeowner wants to rent out the spot for a lower amount that makes" + 
-                        "his offering competitive, what should be charge if he lists it on a company that takes 30 percent in commision fees. Do not provide an explaination just a final price.")
-    clean = float(our_price.remove("$", ""))
+    clean = ""
+    while type(clean) != float:
+        surrounding_price = get_response("Create a lower bound guess on the average hourly parking price in" + city + "Make the best possible guess you can." +
+                        "Return only the price, and say nothing else.")
+        our_price = get_response("A parking spot in LA is" + surrounding_price +  "on average. A homeowner wants to rent out the spot for a lower amount that makes" + 
+                            "his offering competitive, what should be charge if he lists it on a company that takes 30 percent in commision fees. Do not provide an explaination just a final price.")
+        clean = float(our_price.remove("$", ""))
     return our_price 
 
 

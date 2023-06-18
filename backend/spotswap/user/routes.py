@@ -15,7 +15,9 @@ from spotswap.auth.blocklist import BLOCKLIST
 from flask_api import FlaskAPI, status, exceptions
 from flask_jwt_extended import create_access_token,get_jwt,get_jwt_identity, \
                                 unset_jwt_cookies, jwt_required, JWTManager
-
+from spotswap.models.Address import Address
+from spotswap.models.Availability import Availability
+    
 user = Blueprint('user', __name__)
 
 
