@@ -10,12 +10,15 @@ from spotswap import db, jwt
 from flask_sqlalchemy import func
 from spotswap.utils.util_helpers import send_confirmation_mail
 import json
+from spotswap.user.utils import is_time_slot_available
 from cerberus import Validator
 from spotswap.auth.blocklist import BLOCKLIST
 from flask_api import FlaskAPI, status, exceptions
 from flask_jwt_extended import create_access_token,get_jwt,get_jwt_identity, \
                                 unset_jwt_cookies, jwt_required, JWTManager
-
+from spotswap.models.Address import Address
+from spotswap.models.Availability import Availability
+    
 user = Blueprint('user', __name__)
 
 
@@ -94,6 +97,8 @@ def create_parking_lot():
         city = request_body.get('city')
         state = request_body.get('state')
         zip_code = request_body.get('zip')
+        latitude = request_body.get('latitude')
+        longitude = request_body.get('longitude')
         # price = request_body.get('price')
         user = User.query.filter_by(email=get_jwt_identity()).first()
         
@@ -101,7 +106,7 @@ def create_parking_lot():
         address = Address.query.filter_by(street=street, city=city, state=state, zip=zip_code).first()
         if address is None:
             # Create a new Address object
-            address = Address(street=street, city=city, state=state, zip=zip_code, latitude=None, longitude=None)
+            address = Address(street=street, city=city, state=state, zip=zip_code, latitude=latitude, longitude=longitude)
             db.session.add(address)
             db.session.commit()
         
@@ -185,7 +190,7 @@ def search_parking_lots():
             'state': parking_lot.address.state,
             'zip': parking_lot.address.zip,
             'price': parking_lot.price,
-            'availability': availability_data,
+            'availability': availability_data
             # Include other relevant data in the result
         }
         results.append(result)
@@ -360,10 +365,10 @@ def create_booking(parking_id):
 
 
 
-@user.route('/users/<int:user_id>/parking-lots', methods=['GET'])
+@user.route('/parking-lots', methods=['GET'])
 def get_user_parking_lots(user_id):
     # Retrieve the user associated with the given user_id
-    user = User.query.get_or_404(user_id)
+    user = User.query.filter_by(email=get_jwt_identity()).first()
     
     # Retrieve the parking lots listed by the user
     parking_lots = Parkings.query.filter_by(owner_id=user.id).all()
@@ -416,6 +421,26 @@ def get_money_made():
     
     return jsonify(response_data), 200
 
+
+@user.route('/bookings', methods=['GET'])
+def get_user_bookings():
+    user = User.query.filter_by(email=get_jwt_identity()).first()
+
+    # Retrieve the user's bookings
+    bookings = Bookings.query.filter_by(customer_id=user.id).all()
+
+    # Create a list to store the booking data
+    bookings_data = []
+    for booking in bookings:
+        booking_data = {
+            'id': booking.id,
+            'start_time': booking.start_time_date.strftime('%Y-%m-%d %H:%M:%S'),
+            'end_time': booking.end_time_date.strftime('%Y-%m-%d %H:%M:%S')
+            
+        }
+        bookings_data.append(booking_data)
+
+    return jsonify(bookings_data), 200
 
 
 # Error handler for 404 Not Found
