@@ -1,11 +1,3 @@
-# from functools import wraps
-# from lib2to3.pgen2 import token
-# from urllib import response
-# from flask import Blueprint, render_template, redirect, url_for, flash, jsonify, request
-# from flask_login import login_user, current_user, login_required, logout_user
-
-# user = Blueprint('user', __name__)
-
 from functools import wraps
 from lib2to3.pgen2 import token
 from math import radians, sin, cos, sqrt
@@ -20,7 +12,6 @@ from spotswap.utils.util_helpers import send_confirmation_mail
 import json
 from cerberus import Validator
 from spotswap.auth.blocklist import BLOCKLIST
-# from spotswap.schemas.user_apis import user_signup, user_login
 from flask_api import FlaskAPI, status, exceptions
 from flask_jwt_extended import create_access_token,get_jwt,get_jwt_identity, \
                                 unset_jwt_cookies, jwt_required, JWTManager
@@ -46,31 +37,6 @@ def create_account():
         return "Could not register user", status.HTTP_400_BAD_REQUEST
     else:
         return "User Created", status.HTTP_201_CREATED
-
-
-
-
-
-
-
-
-# @user.route('/confirmation/<string:token>')
-# def email_confirmation(token):
-#     # if current_user.is_authenticated:
-#     #     return redirect(url_for('.dashboard'))
-
-#     token_info = UserToken.query.filter_by(
-#         token=token, token_type='email_confirmation').first()
-
-#     if not token_info:
-#         return "Token Not Found", status.HTTP_401_UNAUTHORIZED
-#     if not token_info.is_valid():
-#         return "Token Expired", status.HTTP_401_UNAUTHORIZED
-#     token_info.user.email_verified = True
-#     token_info.user.is_active = True
-
-#     db.session.commit()
-#     return "Mail Confirmation Successfull" ,status.HTTP_200_OK
 
 
 @user.route('/login', methods=['POST'])
