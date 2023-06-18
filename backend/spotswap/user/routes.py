@@ -315,33 +315,62 @@ def delete_parking_lot_availability(parking_id, availability_id):
 @user.route('/parking-lots/<int:parking_id>/bookings', methods=['POST'])
 @jwt_required()
 def create_booking(parking_id):
-    user = User.query.filter_by(email=get_jwt_identity()).first()
-    
-    # Retrieve the parking lot associated with the given parking_id
-    parking_lot = Parkings.query.get_or_404(parking_id)
-    
-    # Extract the booking details from the request
     request_body = request.get_json()
+    
+    # Extract booking data from the request
     start_time = request_body.get('start_time')
     end_time = request_body.get('end_time')
+    # Other booking data...
     
-    # Perform any additional validation or checks on the booking details
-    if not start_time or not end_time:
-        return jsonify({'error': 'Invalid booking details'}), 400
+    user = User.query.filter_by(email=get_jwt_identity()).first()
+    parking_lot = Parkings.query.get_or_404(parking_id)
     
-    if start_time >= end_time:
-        return jsonify({'error': 'Invalid booking duration'}), 400
+    # Check if the requested time slot is available
+    availability = Availability.query.filter_by(parking_id=parking_id, is_available=True).first()
+    if availability is None or not is_time_slot_available(availability, start_time, end_time):
+        return "Time slot is not available", 400
     
-    # Create a new booking object
-    booking = Bookings(customer_id=user.id, parking_id=parking_lot.id, start_time_date=start_time, end_time_date=end_time)
+    # Create the booking
+    booking = Bookings(
+        customer_id=user.id,
+        parking_id=parking_id,
+        start_time_date=start_time,
+        end_time_date=end_time
+        # Other booking data...
+    )
     
-    try:
-        # Add the booking to the database session
-        db.session.add(booking)
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': 'Failed to create booking', 'message': str(e)}), 500
+    # Update the availability based on the booked time slot
+    if start_time > availability.start_time and end_time < availability.end_time:
+        # Booking is within the availability time slot, split it into two availabilities
+        remaining_availability_1 = Availability(
+            parking_id=parking_id,
+            start_time=availability.start_time,
+            end_time=start_time
+        )
+        remaining_availability_2 = Availability(
+            parking_id=parking_id,
+            start_time=end_time,
+            end_time=availability.end_time
+        )
+        
+        # Mark the original availability as booked
+        availability.is_available = False
+        
+        db.session.add_all([booking, remaining_availability_1, remaining_availability_2])
+    elif start_time > availability.start_time:
+        # Booking starts after the availability start time, update the availability end time
+        availability.end_time = start_time
+        db.session.add_all([booking, availability])
+    elif end_time < availability.end_time:
+        # Booking ends before the availability end time, update the availability start time
+        availability.start_time = end_time
+        db.session.add_all([booking, availability])
+    else:
+        # Booking covers the entire availability time slot, mark it as booked
+        availability.is_available = False
+        db.session.add_all([booking, availability])
+    
+    db.session.commit()
     
     response_data = {
         'booking_id': booking.id,
@@ -351,11 +380,12 @@ def create_booking(parking_id):
         'state': parking_lot.address.state,
         'zip': parking_lot.address.zip,
         'start_time': booking.start_time_date.strftime('%Y-%m-%d %H:%M:%S'),
-        'end_time': booking.end_time_date.strftime('%Y-%m-%d %H:%M:%S'),
+        'end_time': booking.end_time_date.strftime('%Y-%m-%d %H:%M:%S')
         # Include other relevant booking data in the response
     }
     
     return jsonify(response_data), 201
+
 
 @user.route('/users/<int:user_id>/parking-lots', methods=['GET'])
 def get_user_parking_lots(user_id):
