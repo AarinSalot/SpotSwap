@@ -7,11 +7,13 @@ from flask_login import login_user, current_user, login_required, logout_user
 from spotswap.models import User, Address, Parkings, Wallet, Availability, Bookings
 from spotswap.models.utils import rand_pass
 from spotswap import db, jwt
-from flask_sqlalchemy import func
+from sqlalchemy import func
 from spotswap.utils.util_helpers import send_confirmation_mail
 import json
 from spotswap.user.utils import is_time_slot_available
+from spotswap.user.utils import time_slot_id
 from cerberus import Validator
+from datetime import datetime
 from spotswap.auth.blocklist import BLOCKLIST
 from flask_api import FlaskAPI, status, exceptions
 from flask_jwt_extended import create_access_token,get_jwt,get_jwt_identity, \
@@ -287,9 +289,8 @@ def create_booking(parking_id):
     request_body = request.get_json()
 
     # Extract booking data from the request
-    start_date = request_body.get('start_date')
+    date = request_body.get('date')
     start_time = request_body.get('start_time')
-    end_date = request_body.get('end_date')
     end_time = request_body.get('end_time')
     # Other booking data...
 
@@ -297,53 +298,56 @@ def create_booking(parking_id):
     parking_lot = Parkings.query.get_or_404(parking_id)
 
     # Check if the requested time slot is available
-    availability = Availability.query.filter_by(parking_id=parking_id, is_available=True).first()
-    if availability is None or not is_time_slot_available(availability, start_date, start_time, end_date, end_time):
+    availability = Availability.query.filter_by(parking_id=parking_id, is_available=True).all()
+    if availability is None or not is_time_slot_available(availability, date, start_time, end_time):
         return "Time slot is not available", 400
 
+    start_datetime = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %H:%M")
+    end_datetime = datetime.strptime(f"{date} {end_time}", "%Y-%m-%d %H:%M")
     # Create the booking
     booking = Bookings(
         customer_id=user.id,
         parking_id=parking_id,
-        start_date=start_date,
-        start_time=start_time,
-        end_date=end_date,
-        end_time=end_time
-        # Other booking data...
+        start_time_date=start_datetime,
+        end_time_date=end_datetime
     )
+    
+    avail = time_slot_id(availability, date, start_time, end_time)
 
+    start_time = datetime.strptime(start_time, "%H:%M").time()
+    end_time = datetime.strptime(end_time, "%H:%M").time()
     # Update the availability based on the booked time slot
-    if start_time > availability.start_time and end_time < availability.end_time:
+    if start_time > avail.start_time and end_time < avail.end_time:
         # Booking is within the availability time slot, split it into two availabilities
         remaining_availability_1 = Availability(
             parking_id=parking_id,
-            date=availability.date,
-            start_time=availability.start_time,
+            date=avail.date,
+            start_time=avail.start_time,
             end_time=start_time
         )
         remaining_availability_2 = Availability(
             parking_id=parking_id,
-            date=availability.date,
+            date=avail.date,
             start_time=end_time,
-            end_time=availability.end_time
+            end_time=avail.end_time
         )
 
         # Mark the original availability as booked
-        availability.is_available = False
+        avail.is_available = False
 
         db.session.add_all([booking, remaining_availability_1, remaining_availability_2])
-    elif start_time > availability.start_time:
+    elif start_time > avail.start_time:
         # Booking starts after the availability start time, update the availability end time
-        availability.end_time = start_time
-        db.session.add_all([booking, availability])
-    elif end_time < availability.end_time:
+        avail.end_time = start_time
+        db.session.add_all([booking, avail])
+    elif end_time < avail.end_time:
         # Booking ends before the availability end time, update the availability start time
-        availability.start_time = end_time
-        db.session.add_all([booking, availability])
+        avail.start_time = end_time
+        db.session.add_all([booking, avail])
     else:
         # Booking covers the entire availability time slot, mark it as booked
-        availability.is_available = False
-        db.session.add_all([booking, availability])
+        avail.is_available = False
+        db.session.add_all([booking, avail])
 
     db.session.commit()
 
@@ -354,19 +358,17 @@ def create_booking(parking_id):
         'city': parking_lot.address.city,
         'state': parking_lot.address.state,
         'zip': parking_lot.address.zip,
-        'start_date': booking.start_date.strftime('%Y-%m-%d'),
         'start_time': booking.start_time.strftime('%H:%M'),
-        'end_date': booking.end_date.strftime('%Y-%m-%d'),
         'end_time': booking.end_time.strftime('%H:%M')
         # Include other relevant booking data in the response
     }
-
     return jsonify(response_data), 201
 
 
 
 @user.route('/parking-lots', methods=['GET'])
-def get_user_parking_lots(user_id):
+@jwt_required()
+def get_user_parking_lots():
     # Retrieve the user associated with the given user_id
     user = User.query.filter_by(email=get_jwt_identity()).first()
     
@@ -380,10 +382,10 @@ def get_user_parking_lots(user_id):
     for parking_lot in parking_lots:
         parking_lot_info = {
             'id': parking_lot.id,
-            'street': parking_lot.street,
-            'city': parking_lot.city,
-            'state': parking_lot.state,
-            'zip': parking_lot.zip,
+            'street': parking_lot.address.street,
+            'city': parking_lot.address.city,
+            'state': parking_lot.address.state,
+            'zip': parking_lot.address.zip,
             'price': parking_lot.price,
             # Include other relevant data in the response
         }

@@ -11,9 +11,8 @@ import csv
 import os
 import openai
 from flask_cors import CORS
-from config import Config
  
-openai.api_key = Config.OPENAI
+
 
 # print(os.getcwd())
 db = SQLAlchemy()
@@ -37,6 +36,7 @@ def create_app(config=DevelopmentConfig):
     login_manager.session_protection = "strong"
     mail.init_app(app)
     cors.init_app(app, resources={r"/*": {"origins": "*"}})
+    openai.api_key = config.OPENAI
     from spotswap.auth import utils
     from spotswap.auth.blocklist import BLOCKLIST
     from spotswap.main.routes import main

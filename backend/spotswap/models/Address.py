@@ -16,7 +16,7 @@ class Address(db.Model):
     longitude = db.Column(db.Float, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
-    parkings = db.relationship('Parking', backref='address', lazy=True)
+    parkings = db.relationship('Parkings', backref='address', lazy=True)
 
     def __str__(self):
         return 'Address: {}'.format(self.id)
