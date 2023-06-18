@@ -3,15 +3,18 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from flask_login import LoginManager
 from flask_mail import Mail
-from crop_analysis.config import DevelopmentConfig
+from spotswap.config import DevelopmentConfig
 from flask_jwt_extended import JWTManager
-from twilio.rest import Client
+# from twilio.rest import Client
 import csv
 import os
+import openai
 from flask_cors import CORS
+from config import Config
+ 
+openai.api_key = Config.OPENAI
 
-
-print(os.getcwd())
+# print(os.getcwd())
 db = SQLAlchemy()
 migrate = Migrate()
 mail = Mail()
@@ -33,19 +36,18 @@ def create_app(config=DevelopmentConfig):
     login_manager.session_protection = "strong"
     mail.init_app(app)
     cors.init_app(app, resources={r"/*": {"origins": "*"}})
-    from crop_analysis.models.Crop import Crop
-    from crop_analysis.models.CropData import CropData
-    from crop_analysis.models.District import District
-    from crop_analysis.models.Season import Season
-    from crop_analysis.models.State import State
-    from crop_analysis.models.User import User
-    from crop_analysis.models.UserToken import UserToken
-    from crop_analysis.models.UserCrop import UserCrop
-    from crop_analysis.auth import utils
-    from crop_analysis.auth.blocklist import BLOCKLIST
-    from crop_analysis.main.routes import main
+    from spotswap.auth import utils
+    from spotswap.auth.blocklist import BLOCKLIST
+    from spotswap.main.routes import main
+    from spotswap.models.Bookings import Bookings
+    from spotswap.models.Parkings import Parkings
+    from spotswap.models.User import User
+    from spotswap.models.UserToken import UserToken
+    from spotswap.models.Wallet import Wallet 
+    from spotswap.models.Address import Address
+    from spotswap.models.Availability import Availability
     # from iot_security.api.routes import api
-    from crop_analysis.user.routes import user
+    from spotswap.user.routes import user
     app.register_blueprint(user,url_prefix='/api/user')
     # app.register_error_handler(404, handle_error_404)
     # app.register_error_handler(500, handle_error_500)
@@ -73,80 +75,32 @@ def create_app(config=DevelopmentConfig):
             401,
         )
 
-
-    # Meghana - Create Table and Insert
     with app.app_context():
         db.create_all()
         db.session.commit()
-        
-    # Steve & Meghana
-    
-        
-        # with open('finaldata.csv') as csv_file:
-        #     csv_reader = csv.reader(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        #     next(csv_reader) # Skip first row
-        #     for row in csv_reader:
-        #         try:
-        #             state = State.query.filter_by(state_name=row[0]).first()
-        #             if not state:
-        #                 state = State(state_name=row[0])
-        #                 db.session.add(state)
-        #                 db.session.commit()
-        #             crop = Crop.query.filter_by(crop_name=row[1]).first()
-        #             if not crop:
-        #                 crop = Crop(crop_name=row[1])
-        #                 db.session.add(crop)
-        #                 db.session.commit()
-        #             season = Season.query.filter_by(season_name=row[2]).first()
-        #             if not season:
-        #                 season = Season(season_name=row[2])
-        #                 db.session.add(season)
-        #                 db.session.commit()
-        #             district = District.query.filter_by(district_name=row[3]).first()
-        #             if not district:
-        #                 district = District(district_name=row[3], state_id=state.state_id)
-        #                 db.session.add(district)
-        #                 db.session.commit()
-        #             crop_data = CropData(crop_id=crop.crop_id, season_id=season.season_id, district_id=district.district_id, area=row[4], production=row[5], yield_data=row[6], profit=row[7], rainfall=row[8], year=row[9])
-        #             db.session.add(crop_data)
-        #             db.session.commit()
-        #         except Exception as e:
-        #             print(f"Failed to insert row {row}: {str(e)}")
-        #             db.session.rollback()
-        #return True
-        # with open('finaldata.csv') as file:
-            
-        #     for line in file:
-        #         print(line)
-        #         state_name, crop_name, season_name, district_name, area, production, yield_, profit, rainfall, year = line.strip().split(',')
-        #         if state_name == "State":
-        #             print("HEY ADS D")
-        #             continue
-        #         if state_name is None and crop_name is None and season_name is None and district_name is None and area is None and production is None and yield_ is None:
-        #             continue
-        #         # print("State : ",state_name,"Crop : " ,crop_name,"Season Name : " ,season_name,"District Name : " ,district_name,"Area : " ,area, "Production : " ,production,"Yeild : " ,yield_,"Profit : " ,profit, "Rainfall : " ,rainfall, "Year : " ,year)
-        #         state = State.query.filter_by(state_name=state_name).first()
-        #         if not state:
-        #             state = State(state_name=state_name)
-        #             db.session.add(state)
-        #             db.session.commit()
-        #         crop = Crop.query.filter_by(crop_name=crop_name).first()
-        #         if not crop:
-        #             crop = Crop(crop_name=crop_name)
-        #             db.session.add(crop)
-        #             db.session.commit()
-        #         season = Season.query.filter_by(season_name=season_name).first()
-        #         if not season:
-        #             season = Season(season_name=season_name)
-        #             db.session.add(season)
-        #             db.session.commit()
-        #         district = District.query.filter_by(district_name=district_name).first()
-        #         if not district:
-        #             district = District(district_name=district_name, state_id=state.state_id)
-        #             db.session.add(district)
-        #             db.session.commit()
-        #         crop_data = CropData(crop_id=crop.crop_id, season_id=season.season_id, district_id=district.district_id, area=float(area), production=float(production), yield_data=float(yield_), profit=float(profit), rainfall=float(rainfall), year=int(year))
-        #         db.session.add(crop_data)
-        #         db.session.commit()
 
     return app
+
+def get_response(message):
+    response = openai.ChatCompletion.create(
+        model = 'gpt-3.5-turbo',
+        temperature = 1,
+        messages = [
+            {"role": "user", "content": message}
+        ]
+    )
+    rv = response.choices[0]["message"]["content"]
+    return rv
+
+
+def get_price(city):
+    surrounding_price = get_response("Create a lower bound guess on the average hourly parking price in" + city + "Make the best possible guess you can." +
+                       "Return only the price, and say nothing else.")
+    our_price = get_response("A parking spot in LA is" + surrounding_price +  "on average. A homeowner wants to rent out the spot for a lower amount that makes" + 
+                        "his offering competitive, what should be charge if he lists it on a company that takes 30 percent in commision fees. Do not provide an explaination just a final price.")
+    clean = float(our_price.remove("$", ""))
+    return our_price 
+
+
+
+

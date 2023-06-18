@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 from secrets import token_urlsafe
-from crop_analysis import db
+from spotswap import db
 
 # Harshita
 class UserToken(db.Model):
